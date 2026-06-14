@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<!-- saved from url=(0055)file:///C:/Users/bakid/Downloads/stock_dashboard_6.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stock Dashboard</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="./stock_dashboard_files/chart.umd.min.js.Download"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
   :root {
@@ -20,11 +20,14 @@
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:13px;}
 
-  .topbar{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);padding:5px 12px;display:flex;align-items:center;gap:10px;}
-  .topbar-brand{font-size:12px;font-weight:700;color:var(--blue);letter-spacing:.04em;white-space:nowrap;}
-  .ticker-scroll{display:flex;gap:4px;flex:1;overflow-x:auto;scrollbar-width:none;}
-  .ticker-scroll::-webkit-scrollbar{display:none;}
-  .ticker-btn{font-family:var(--mono);font-size:10px;font-weight:500;padding:3px 7px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--text-muted);cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0;}
+  .topbar{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);display:flex;flex-direction:column;}
+  .topbar-top{padding:5px 12px;display:flex;align-items:center;justify-content:space-between;}
+  .topbar-brand{font-size:13px;font-weight:700;color:var(--blue);letter-spacing:.04em;white-space:nowrap;}
+  .ticker-scroll{display:flex;gap:4px;padding:4px 12px 6px;overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
+  .ticker-scroll::-webkit-scrollbar{height:3px;}
+  .ticker-scroll::-webkit-scrollbar-track{background:transparent;}
+  .ticker-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+  .ticker-btn{font-family:var(--mono);font-size:10px;font-weight:500;padding:3px 8px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--text-muted);cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0;}
   .ticker-btn:hover{border-color:var(--blue);color:var(--blue);}
   .ticker-btn.active{background:var(--blue-dim);border-color:var(--blue);color:var(--blue);}
   .ticker-btn.up{color:var(--green);} .ticker-btn.down{color:var(--red);}
@@ -114,11 +117,13 @@
 </head>
 <body>
 <div class="topbar">
-  <div class="topbar-brand">📊 STOCK TERMINAL</div>
+  <div class="topbar-top">
+    <div class="topbar-brand">📊 STOCK TERMINAL</div>
+    <div class="last-updated" id="lastUpdated"></div>
+  </div>
   <div class="ticker-scroll" id="tickerBtns"></div>
-  <div class="last-updated" id="lastUpdated"></div>
 </div>
-<div id="loading"><div class="spinner"></div><div style="color:var(--text-muted);font-size:12px;">Loading dashboard_data.json …</div></div>
+<div id="loading"><div style="color:var(--red);text-align:center;"><div style="font-size:20px;margin-bottom:8px;">⚠️ Error: Failed to fetch</div><div style="color:var(--text-muted);font-size:12px;">Run: python fetch_dashboard_data.py first.</div></div></div>
 <div class="main" id="main">
   <div class="hero-row">
     <div class="hero-name">
@@ -158,7 +163,7 @@
       <div class="card-body" style="padding:8px;"><div class="fv-table-wrap" id="valuationTable"></div></div>
     </div>
     <div class="card">
-      <div class="card-header">Profitability & Growth</div>
+      <div class="card-header">Profitability &amp; Growth</div>
       <div class="card-body" style="padding:8px;"><div class="fv-table-wrap" id="profitTable"></div></div>
     </div>
   </div>
@@ -436,5 +441,6 @@ function fmtDate(d){if(!d)return'—';const s=typeof d==='number'?new Date(d*100
 
 loadData();
 </script>
-</body>
-</html>
+
+
+</body></html>
