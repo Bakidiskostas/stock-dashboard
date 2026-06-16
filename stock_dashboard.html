@@ -138,18 +138,11 @@
   <div class="stats-row" id="statsPills"></div>
   <!-- SCORES -->
   <div class="scores-row" id="scoresRow"></div>
-  <!-- Price + Key Metrics -->
+  <!-- Forward P/E + Key Metrics -->
   <div class="content-grid wide" style="margin-bottom:14px;">
     <div class="card">
-      <div class="card-header">Price History
-        <div class="period-btns">
-          <button class="period-btn" data-period="1w">1W</button>
-          <button class="period-btn" data-period="1m">1M</button>
-          <button class="period-btn active" data-period="6m">6M</button>
-          <button class="period-btn" data-period="1y">1Y</button>
-        </div>
-      </div>
-      <div class="card-body"><div class="chart-wrap"><canvas id="priceChart"></canvas></div></div>
+      <div class="card-header">Forward P/E History — vs Average</div>
+      <div class="card-body"><div class="chart-wrap"><canvas id="fwdPeChart"></canvas></div></div>
     </div>
     <div class="card">
       <div class="card-header">Key Metrics</div>
@@ -189,11 +182,25 @@
       <div class="card-body"><div class="chart-wrap"><canvas id="revisionChart2"></canvas></div></div>
     </div>
   </div>
+  <!-- Price History -->
+  <div class="content-grid" style="margin-bottom:14px;grid-template-columns:1fr;">
+    <div class="card">
+      <div class="card-header">Price History
+        <div class="period-btns">
+          <button class="period-btn" data-period="1w">1W</button>
+          <button class="period-btn" data-period="1m">1M</button>
+          <button class="period-btn active" data-period="6m">6M</button>
+          <button class="period-btn" data-period="1y">1Y</button>
+        </div>
+      </div>
+      <div class="card-body"><div class="chart-wrap"><canvas id="priceChart"></canvas></div></div>
+    </div>
+  </div>
 </div>
 
 <script>
 let dashData=null, currentTicker=null, currentPeriod='6m';
-let priceChart=null, earningsChart=null, revChart=null, revChart2=null;
+let priceChart=null, earningsChart=null, revChart=null, revChart2=null, fwdPeChart=null;
 
 async function loadData() {
   try {
@@ -243,6 +250,7 @@ function selectTicker(ticker) {
   renderRevisionChart(stock.epsTrend,'Current Year','revisionChart',revChart,v=>revChart=v);
   renderRevisionChart(stock.epsTrend,'Next Year','revisionChart2',revChart2,v=>revChart2=v);
   renderPriceChart(ticker, currentPeriod);
+  renderFwdPeChart(stock.fwdPeHist||[]);
 }
 
 function renderHero(ticker, info) {
@@ -385,10 +393,24 @@ function renderEpsTrend(epsTrend) {
   wrap.innerHTML=html;
 }
 
+function showNoData(canvas, message) {
+  canvas.style.display='none';
+  let msg=canvas.parentElement.querySelector('.no-data');
+  if(!msg){msg=document.createElement('div');msg.className='no-data';canvas.parentElement.appendChild(msg);}
+  msg.textContent=message;
+  msg.style.display='flex';
+}
+function hideNoData(canvas) {
+  canvas.style.display='block';
+  const msg=canvas.parentElement.querySelector('.no-data');
+  if(msg) msg.style.display='none';
+}
+
 function renderEarningsChart(earningsHist) {
-  if(earningsChart) earningsChart.destroy();
+  if(earningsChart){earningsChart.destroy();earningsChart=null;}
   const canvas=document.getElementById('earningsChart');
-  if(!earningsHist||earningsHist.length===0){canvas.parentElement.innerHTML='<div class="no-data">No earnings history</div>';return;}
+  if(!earningsHist||earningsHist.length===0){showNoData(canvas,'No earnings history');return;}
+  hideNoData(canvas);
   const labels=earningsHist.map(e=>e.date?e.date.slice(0,7):'');
   const actual=earningsHist.map(e=>e.epsActual);
   const est=earningsHist.map(e=>e.epsEstimate);
@@ -401,7 +423,8 @@ function renderEarningsChart(earningsHist) {
 function renderRevisionChart(epsTrend,periodKey,canvasId,instance,setter) {
   if(instance) instance.destroy();
   const canvas=document.getElementById(canvasId);
-  if(!epsTrend||!epsTrend[periodKey]){canvas.parentElement.innerHTML=`<div class="no-data">No data for ${periodKey}</div>`;setter(null);return;}
+  if(!epsTrend||!epsTrend[periodKey]){showNoData(canvas,`No data for ${periodKey}`);setter(null);return;}
+  hideNoData(canvas);
   const estimates=['90 Days Ago','60 Days Ago','30 Days Ago','7 Days Ago','Current Estimate'];
   const vals=estimates.map(e=>epsTrend[periodKey][e]);
   const color=vals[4]>vals[0]?'#3FB950':vals[4]<vals[0]?'#F85149':'#58A6FF';
@@ -409,14 +432,41 @@ function renderRevisionChart(epsTrend,periodKey,canvasId,instance,setter) {
 }
 
 function renderPriceChart(ticker,period) {
-  if(priceChart) priceChart.destroy();
+  if(priceChart){priceChart.destroy();priceChart=null;}
   const canvas=document.getElementById('priceChart');
   const hist=dashData.data[ticker]?.priceHist?.[period]||[];
-  if(!hist.length){canvas.parentElement.innerHTML='<div class="no-data">No price data</div>';return;}
+  if(!hist.length){showNoData(canvas,'No price data');return;}
+  hideNoData(canvas);
   const labels=hist.map(h=>h.t.slice(0,period==='1w'?13:10));
   const closes=hist.map(h=>h.c);
-  const color=closes[closes.length-1]>=closes[0]?'#3FB950':'#F85149';
-  priceChart=new Chart(canvas,{type:'line',data:{labels,datasets:[{label:'Close',data:closes,borderColor:color,backgroundColor:color+'18',fill:true,pointRadius:0,borderWidth:1.8,tension:0.2}]},options:chartOpts()});
+  const first=closes[0], last=closes[closes.length-1];
+  const ret=(first&&first!==0)?((last-first)/first*100):null;
+  const color=last>=first?'#3FB950':'#F85149';
+  const periodLabels={'1w':'1W','1m':'1M','6m':'6M','1y':'1Y'};
+  const retLabel=ret!=null?`${periodLabels[period]||period}: ${ret>=0?'+':''}${ret.toFixed(2)}%`:(periodLabels[period]||period);
+  const opts=chartOpts();
+  opts.plugins.tooltip.callbacks.label=ctx=>{const v=ctx.parsed.y;return v!=null?` Close: ${v.toFixed(2)}`:null;};
+  priceChart=new Chart(canvas,{type:'line',data:{labels,datasets:[{label:retLabel,data:closes,borderColor:color,backgroundColor:color+'18',fill:true,pointRadius:0,borderWidth:1.8,tension:0.2}]},options:opts});
+}
+
+function renderFwdPeChart(fwdPeHist) {
+  if(fwdPeChart){fwdPeChart.destroy();fwdPeChart=null;}
+  const canvas=document.getElementById('fwdPeChart');
+  if(!fwdPeHist||fwdPeHist.length<2){showNoData(canvas,'Not enough data for Forward P/E history');return;}
+  hideNoData(canvas);
+  const labels=fwdPeHist.map(p=>p.label);
+  const vals=fwdPeHist.map(p=>p.pe);
+  const avg=vals.reduce((a,b)=>a+b,0)/vals.length;
+  const current=vals[vals.length-1];
+  const lineColor=current<=avg?'#3FB950':'#F85149';
+  fwdPeChart=new Chart(canvas,{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'Forward P/E',data:vals,borderColor:lineColor,backgroundColor:lineColor+'1A',fill:true,pointBackgroundColor:lineColor,pointRadius:4,borderWidth:2,tension:0.3,order:1},
+      {label:`Average (${avg.toFixed(1)})`,data:vals.map(()=>avg),borderColor:'#58A6FF',borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false,order:0}
+    ]},
+    options:chartOpts()
+  });
 }
 
 function chartOpts() {
