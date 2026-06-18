@@ -57,7 +57,26 @@
   .stat-pill .sval{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--text);}
 
   /* SCORES ROW */
-  .scores-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
+  .scores-row{display:flex;flex-wrap:wrap;gap:8px;}
+  .scores-row-wrap{display:flex;flex-wrap:wrap;align-items:stretch;gap:10px;margin-bottom:16px;}
+  .ranking-btn{margin-left:auto;font-size:12px;font-weight:600;padding:0 18px;border-radius:8px;border:1px solid var(--blue);background:var(--surface);color:var(--blue);cursor:pointer;white-space:nowrap;transition:all .15s;display:flex;align-items:center;gap:6px;}
+  .ranking-btn:hover{background:var(--blue);color:#fff;}
+  /* RANKING MODAL */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .modal-box{background:var(--surface);border:1px solid var(--border2);border-radius:10px;width:100%;max-width:760px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.5);}
+  .modal-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;color:var(--text);}
+  .modal-close{background:transparent;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;line-height:1;padding:2px 8px;border-radius:4px;}
+  .modal-close:hover{background:var(--surface2);color:var(--text);}
+  .modal-body{overflow-y:auto;}
+  .rank-tbl{width:100%;border-collapse:collapse;font-size:13px;}
+  .rank-tbl th{position:sticky;top:0;background:var(--surface2);color:var(--text-muted);text-align:left;padding:9px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border);}
+  .rank-tbl td{padding:9px 14px;border-bottom:1px solid var(--border);color:var(--text);}
+  .rank-tbl tbody tr{cursor:pointer;}
+  .rank-tbl tbody tr:hover td{background:var(--surface2);}
+  .rank-num{color:var(--text-dim);font-family:var(--mono);width:38px;}
+  .rank-tkr{font-family:var(--mono);font-weight:700;}
+  .rank-total{font-family:var(--mono);font-weight:700;text-align:right;}
+  .rank-tbl tbody tr.active-row td{background:var(--surface2);}
   .score-pill{border-radius:8px;padding:10px 14px;display:flex;flex-direction:column;gap:4px;min-width:90px;border:1px solid transparent;}
   .score-pill .sc-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:600;}
   .score-pill .sc-val{font-family:var(--mono);font-size:20px;font-weight:700;}
@@ -137,7 +156,10 @@
   </div>
   <div class="stats-row" id="statsPills"></div>
   <!-- SCORES -->
-  <div class="scores-row" id="scoresRow"></div>
+  <div class="scores-row-wrap">
+    <div class="scores-row" id="scoresRow"></div>
+    <button id="rankingBtn" class="ranking-btn">🏆 Κατάταξη</button>
+  </div>
   <!-- Forward P/E + Key Metrics -->
   <div class="content-grid wide" style="margin-bottom:14px;">
     <div class="card">
@@ -194,7 +216,17 @@
         </div>
       </div>
       <div class="card-body"><div class="chart-wrap"><canvas id="priceChart"></canvas></div></div>
+  </div>
+</div>
+
+<!-- RANKING MODAL -->
+<div id="rankingModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span>🏆 Κατάταξη — Total Score</span>
+      <button class="modal-close" id="rankingCloseBtn">✕</button>
     </div>
+    <div class="modal-body" id="rankingBody"></div>
   </div>
 </div>
 
@@ -241,7 +273,7 @@ function selectTicker(ticker) {
   const stock = dashData.data[ticker]||{};
   renderHero(ticker, stock.info||{});
   renderStats(stock.info||{});
-  renderScores(stock.scores||{});
+  renderScores(buildScores(stock));
   renderBilanz(stock.info||{});
   renderValuationTable(stock.finviz||{});
   renderProfitTable(stock.finviz||{});
@@ -284,14 +316,47 @@ function renderStats(info) {
   document.getElementById('statsPills').innerHTML=pills.map(([l,v])=>`<div class="stat-pill"><div class="slabel">${l}</div><div class="sval">${v}</div></div>`).join('');
 }
 
+function buildScores(stock) {
+  const scores = Object.assign({}, stock.scores||{});
+
+  // EPS History: +1 for each quarter the company beat/met estimate (green), -1 for each miss (red)
+  const eh = stock.earningsHist || [];
+  let ehScore=0, ehHas=false;
+  eh.forEach(e=>{
+    if(e.epsActual!=null && e.epsEstimate!=null){
+      ehScore += (e.epsActual>=e.epsEstimate) ? 1 : -1;
+      ehHas=true;
+    }
+  });
+  scores['EPS History'] = ehHas ? ehScore : null;
+
+  // EPS Trend: for Current Year & Next Year, +1 if estimate was revised UP (60 Days Ago < Current Estimate), else -1
+  const et = stock.epsTrend || {};
+  let etScore=0, etHas=false;
+  ['Current Year','Next Year'].forEach(period=>{
+    const p = et[period];
+    if(p && p['60 Days Ago']!=null && p['60 Days Ago']!==0 && p['Current Estimate']!=null){
+      etScore += (p['60 Days Ago'] < p['Current Estimate']) ? 1 : -1;
+      etHas=true;
+    }
+  });
+  scores['EPS Trend'] = etHas ? etScore : null;
+
+  // Recompute Total Score from all 8 categories
+  const cats=['Valuation','Financial','Growth','Return','Margin','Trend','EPS History','EPS Trend'];
+  const valid=cats.map(c=>scores[c]).filter(v=>v!=null);
+  scores['Total Score'] = valid.length ? valid.reduce((a,b)=>a+b,0) : null;
+  return scores;
+}
+
 function renderScores(scores) {
-  const order = ['Valuation','Financial','Growth','Return','Margin','Trend','Total Score'];
+  const order = ['Valuation','Financial','Growth','Return','Margin','Trend','EPS History','EPS Trend','Total Score'];
   const html = order.map(name => {
     const val = scores[name];
     const isTotal = name==='Total Score';
     let cls;
     if(val==null) cls='neutral';
-    else if(isTotal) cls=val>10?'green':val<0?'red':'yellow';
+    else if(isTotal) cls=val>=12?'green':val<0?'red':'yellow';
     else cls=val>1?'green':val<-1?'red':'yellow';
     return `<div class="score-pill ${cls} ${isTotal?'total':''}">
       <div class="sc-label">${name}</div>
@@ -300,6 +365,45 @@ function renderScores(scores) {
   }).join('');
   document.getElementById('scoresRow').innerHTML=html;
 }
+
+function openRanking() {
+  const rows = (dashData.tickers||[]).map(t=>{
+    const stock = dashData.data[t]||{};
+    const sc = buildScores(stock);
+    return {ticker:t, name:(stock.info&&stock.info.name)||'', total:sc['Total Score']};
+  });
+  rows.sort((a,b)=>(b.total==null?-1e9:b.total)-(a.total==null?-1e9:a.total));
+  const body = `<table class="rank-tbl"><thead><tr>
+      <th>#</th><th>Ticker</th><th>Εταιρεία</th><th style="text-align:right;">Total Score</th>
+    </tr></thead><tbody>${
+    rows.map((r,i)=>{
+      const cls = r.total==null?'neu':(r.total>=12?'up':r.total<0?'down':'neu');
+      const activeRow = r.ticker===currentTicker?'active-row':'';
+      return `<tr class="${activeRow}" data-ticker="${r.ticker}">
+        <td class="rank-num">${i+1}</td>
+        <td class="rank-tkr">${r.ticker}</td>
+        <td style="color:var(--text-muted);">${r.name}</td>
+        <td class="rank-total ${cls}">${r.total==null?'—':r.total}</td>
+      </tr>`;
+    }).join('')
+  }</tbody></table>`;
+  document.getElementById('rankingBody').innerHTML = body;
+  document.getElementById('rankingModal').style.display='flex';
+}
+
+function closeRanking() {
+  document.getElementById('rankingModal').style.display='none';
+}
+
+function gotoFromRanking(t) {
+  closeRanking();
+  selectTicker(t);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') closeRanking();
+});
 
 function scoreClass(col, val) {
   if(val==null||val==='N/A') return '';
@@ -455,7 +559,8 @@ function renderFwdPeChart(fwdPeHist) {
   if(!fwdPeHist||fwdPeHist.length<2){showNoData(canvas,'Not enough data for Forward P/E history');return;}
   hideNoData(canvas);
   const labels=fwdPeHist.map(p=>p.label);
-  const vals=fwdPeHist.map(p=>p.pe);
+  const clamp=v=>(v==null||v<0||v>200)?200:v;
+  const vals=fwdPeHist.map(p=>clamp(p.pe));
   const avg=vals.reduce((a,b)=>a+b,0)/vals.length;
   const current=vals[vals.length-1];
   const lineColor=current<=avg?'#3FB950':'#F85149';
@@ -488,6 +593,16 @@ document.querySelectorAll('.period-btn').forEach(btn=>{
 
 function fmtLarge(n){if(n==null)return'—';if(n>=1e12)return(n/1e12).toFixed(2)+'T';if(n>=1e9)return(n/1e9).toFixed(2)+'B';if(n>=1e6)return(n/1e6).toFixed(2)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return n.toString();}
 function fmtDate(d){if(!d)return'—';const s=typeof d==='number'?new Date(d*1000).toISOString():String(d);return s.slice(0,10);}
+
+document.getElementById('rankingBtn').addEventListener('click', openRanking);
+document.getElementById('rankingCloseBtn').addEventListener('click', closeRanking);
+document.getElementById('rankingModal').addEventListener('click', e=>{
+  if(e.target===e.currentTarget) closeRanking();
+});
+document.getElementById('rankingBody').addEventListener('click', e=>{
+  const tr = e.target.closest('tr[data-ticker]');
+  if(tr) gotoFromRanking(tr.dataset.ticker);
+});
 
 loadData();
 </script>
