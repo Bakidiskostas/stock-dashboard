@@ -324,7 +324,7 @@ function buildScores(stock) {
   let ehScore=0, ehHas=false;
   eh.forEach(e=>{
     if(e.epsActual!=null && e.epsEstimate!=null){
-      ehScore += (e.epsActual>=e.epsEstimate) ? 1 : -1;
+      ehScore += (e.epsActual>=e.epsEstimate) ? 0.5 : -0.5;
       ehHas=true;
     }
   });
