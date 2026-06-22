@@ -445,7 +445,7 @@ function renderValuationTable(fv) {
 }
 
 function renderProfitTable(fv) {
-  const rows=[['ROA',fv['ROA']],['ROE',fv['ROE']],['ROIC',fv['ROIC']],['Gross Margin',fv['Gross Margin']],['Oper. Margin',fv['Oper. Margin']],['Profit Margin',fv['Profit Margin']],['EPS this Y %',fv['EPS this Y %']],['EPS next Y %',fv['EPS next Y %']],['EPS next 5Y %',fv['EPS next 5Y %']],['Sales Y/Y TTM %',fv['Sales Y/Y TTM %']]];
+  const rows=[['ROA',fv['ROA']],['ROE',fv['ROE']],['ROIC',fv['ROIC']],['Gross Margin',fv['Gross Margin']],['Oper. Margin',fv['Oper. Margin']],['Profit Margin',fv['Profit Margin']],['EPS this Y %',fv['EPS this Y %']],['EPS next Y %',fv['EPS next Y %']],['EPS next 5Y %',fv['EPS next 5Y %']],['EPS Y/Y TTM %',fv['EPS Y/Y TTM %']],['Sales Y/Y TTM %',fv['Sales Y/Y TTM %']]];
   document.getElementById('profitTable').innerHTML=fvTable(rows);
 }
 
