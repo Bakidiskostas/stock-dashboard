@@ -1,0 +1,33 @@
+name: Update Dashboard Data
+
+on:
+  schedule:
+    - cron: '0 6 * * 1-5'   # Monday–Friday at 06:00 UTC (before US market open)
+  workflow_dispatch:          # Allow manual trigger from GitHub UI
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install yfinance pandas numpy
+
+      - name: Fetch data
+        run: python fetch_dashboard_data.py
+
+      - name: Commit & push updated data
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dashboard_data.json
+          git diff --cached --quiet || git commit -m "auto: update dashboard data $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push
