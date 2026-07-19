@@ -21,8 +21,8 @@
   body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:13px;}
 
   .topbar{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);display:flex;flex-direction:column;}
-  .topbar-top{padding:5px 12px;display:flex;align-items:center;justify-content:space-between;}
-  .topbar-brand{font-size:13px;font-weight:700;color:var(--blue);letter-spacing:.04em;white-space:nowrap;}
+  .topbar-banner{width:100%;display:block;max-height:130px;object-fit:cover;object-position:center top;}
+  .topbar-top{padding:4px 12px;display:flex;align-items:center;justify-content:flex-end;}
   .ticker-scroll{display:flex;gap:4px;padding:4px 12px 6px;overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
   .ticker-scroll::-webkit-scrollbar{height:3px;}
   .ticker-scroll::-webkit-scrollbar-track{background:transparent;}
@@ -136,8 +136,8 @@
 </head>
 <body>
 <div class="topbar">
+  <img class="topbar-banner" src="banner.png" alt="Stock Terminal Dashboard">
   <div class="topbar-top">
-    <div class="topbar-brand">📊 STOCK TERMINAL</div>
     <div class="last-updated" id="lastUpdated"></div>
   </div>
   <div class="ticker-scroll" id="tickerBtns"></div>
