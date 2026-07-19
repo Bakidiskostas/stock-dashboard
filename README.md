@@ -11,9 +11,9 @@ A personal stock research dashboard combining **fundamental analysis**, **techni
 ## ✨ Features
 
 - **Live price header** — current price, change %, 52-week range
-- **Price chart** — switchable 1W (hourly) / 1M / 6M / 1Y views with candlestick OHLCV data
+- **Price chart** — switchable 1W (hourly) / 1M / 6M / 1Y views
 - **Forward P/E history** — historical trend of forward valuation
-- **EPS Trend table** — analyst estimate revisions over 7 / 30 / 60 / 90 days across current & next quarter/year
+- **EPS Trend table** — analyst estimate EPS over 7 / 30 / 60 / 90 days across current & next quarter/year
 - **Earnings history** — actual vs estimate with surprise %
 - **Fundamentals table** — 25+ metrics color-coded green / yellow / red
 - **Scoring model** — 6 category scores + total, computed locally from Yahoo Finance data:
