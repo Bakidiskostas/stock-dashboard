@@ -133,7 +133,7 @@ def get_fundamentals(ticker, t, hist_1y, hist_1m):
     # ── Valuation ──
     pe         = fmt_num(g(info, "trailingPE"))
     forward_pe = fmt_num(g(info, "forwardPE"))
-    peg        = fmt_num(g(info, "pegRatio"))
+    peg        = fmt_num(g(info, "pegRatio"))  # may be N/A; fallback computed below after growth
     ps         = fmt_num(g(info, "priceToSalesTrailing12Months"))
     pb         = fmt_num(g(info, "priceToBook"))
     pfcf = "N/A"
@@ -145,16 +145,43 @@ def get_fundamentals(ticker, t, hist_1y, hist_1m):
 
     # ── Financial health ──
     current_ratio = fmt_num(g(info, "currentRatio"))
-    # yfinance returns debtToEquity already as a ratio (not %)
-    debt_eq = fmt_num(g(info, "debtToEquity"))
+    # yfinance returns debtToEquity as a percentage (e.g. 80 = 0.80 ratio)
+    _de = g(info, "debtToEquity")
+    debt_eq = fmt_num(float(_de) / 100) if _de is not None else "N/A"
 
     # ── Growth ──
-    eps_this_y  = fmt_pct(g(info, "earningsGrowth"))
-    eps_next_y  = fmt_pct(g(info, "earningsQuarterlyGrowth"))
+    # EPS Y/Y TTM & Sales come from actual trailing info fields
     eps_yoy_ttm = fmt_pct(g(info, "earningsGrowth"))
     sales_yoy   = fmt_pct(g(info, "revenueGrowth"))
 
+    # EPS this Y (0y) & next Y (+1y) come from analyst growth_estimates
+    eps_this_y = "N/A"
+    eps_next_y = "N/A"
+    try:
+        ge = t.growth_estimates
+        if ge is not None and not ge.empty:
+            # First column holds the estimate (name varies: 'stockTrend'/ticker)
+            col0 = ge.columns[0]
+            if "0y" in ge.index:
+                v = ge.loc["0y", col0]
+                if v is not None and not (isinstance(v, float) and math.isnan(v)):
+                    eps_this_y = f"{float(v) * 100:.2f}%"
+            if "+1y" in ge.index:
+                v = ge.loc["+1y", col0]
+                if v is not None and not (isinstance(v, float) and math.isnan(v)):
+                    eps_next_y = f"{float(v) * 100:.2f}%"
+    except Exception:
+        pass
 
+    # ── PEG fallback: if yfinance didn't provide it, compute PE / (EPS next-year growth %) ──
+    if peg == "N/A":
+        try:
+            pe_val = float(pe) if pe != "N/A" else float(forward_pe)
+            growth_val = float(eps_next_y.replace("%", "")) if eps_next_y != "N/A" else None
+            if pe_val and growth_val and growth_val > 0:
+                peg = fmt_num(pe_val / growth_val)
+        except Exception:
+            pass
 
     # ── Insider ownership ──
     insider_own = fmt_pct(g(info, "heldPercentInsiders"))
