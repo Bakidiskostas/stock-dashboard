@@ -133,7 +133,11 @@ def get_fundamentals(ticker, t, hist_1y, hist_1m):
     # ── Valuation ──
     pe         = fmt_num(g(info, "trailingPE"))
     forward_pe = fmt_num(g(info, "forwardPE"))
-    peg        = fmt_num(g(info, "pegRatio"))  # may be N/A; fallback computed below after growth
+    # PEG: prefer pegRatio, then trailingPegRatio; a manual fallback is
+    # computed further down once next-year growth is known.
+    peg = fmt_num(g(info, "pegRatio"))
+    if peg == "N/A":
+        peg = fmt_num(g(info, "trailingPegRatio"))
     ps         = fmt_num(g(info, "priceToSalesTrailing12Months"))
     pb         = fmt_num(g(info, "priceToBook"))
     pfcf = "N/A"
@@ -145,22 +149,20 @@ def get_fundamentals(ticker, t, hist_1y, hist_1m):
 
     # ── Financial health ──
     current_ratio = fmt_num(g(info, "currentRatio"))
-    # yfinance normally reports debtToEquity as a percentage (80 => 0.80 ratio),
-    # but some tickers come back already as a ratio. Values above 5 are treated
-    # as percentages; anything smaller is assumed to already be a ratio.
+    # yfinance reports debtToEquity as a percentage (24.925 => 0.25 ratio).
     _de = g(info, "debtToEquity")
     debt_eq = "N/A"
     if _de is not None:
         try:
-            _de = float(_de)
-            debt_eq = fmt_num(_de / 100 if abs(_de) > 5 else _de)
+            debt_eq = fmt_num(float(_de) / 100)
         except Exception:
             debt_eq = "N/A"
 
     # ── Growth ──
-    # yfinance is inconsistent: growth figures come back either as decimal
-    # fractions (0.18) or as already-multiplied percentages (18.0), depending on
-    # the field and the library version. Normalise by magnitude.
+    # yfinance returns all of these as decimal fractions (0.163 == 16.3%).
+    # Values can legitimately be very large for companies recovering from a
+    # near-zero base (GEV's earningsGrowth of 18.165 really is +1816.5%), so we
+    # multiply unconditionally rather than guessing from magnitude.
     def _as_pct(v):
         if v is None:
             return "N/A"
@@ -168,11 +170,7 @@ def get_fundamentals(ticker, t, hist_1y, hist_1m):
             f = float(v)
             if math.isnan(f) or math.isinf(f):
                 return "N/A"
-            # |value| <= 3 is almost certainly a decimal fraction (<=300% growth);
-            # anything larger is already expressed in percent.
-            if abs(f) <= 3:
-                f *= 100
-            return f"{f:.2f}%"
+            return f"{f * 100:.2f}%"
         except Exception:
             return "N/A"
 
@@ -180,18 +178,19 @@ def get_fundamentals(ticker, t, hist_1y, hist_1m):
     eps_yoy_ttm = _as_pct(g(info, "earningsGrowth"))
     sales_yoy   = _as_pct(g(info, "revenueGrowth"))
 
-    # EPS this Y (0y) & next Y (+1y) come from analyst growth_estimates
+    # EPS this Y (0y) & next Y (+1y) come from analyst growth_estimates.
+    # The estimate column is 'stockTrend'; rows are 0q/+1q/0y/+1y/LTG and any of
+    # them may be NaN when analysts haven't published a figure.
     eps_this_y = "N/A"
     eps_next_y = "N/A"
     try:
         ge = t.growth_estimates
         if ge is not None and not ge.empty:
-            # First column holds the estimate (name varies: 'stockTrend'/ticker)
-            col0 = ge.columns[0]
+            col = "stockTrend" if "stockTrend" in ge.columns else ge.columns[0]
             if "0y" in ge.index:
-                eps_this_y = _as_pct(ge.loc["0y", col0])
+                eps_this_y = _as_pct(ge.loc["0y", col])
             if "+1y" in ge.index:
-                eps_next_y = _as_pct(ge.loc["+1y", col0])
+                eps_next_y = _as_pct(ge.loc["+1y", col])
     except Exception:
         pass
 
