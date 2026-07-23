@@ -145,14 +145,40 @@ def get_fundamentals(ticker, t, hist_1y, hist_1m):
 
     # ── Financial health ──
     current_ratio = fmt_num(g(info, "currentRatio"))
-    # yfinance returns debtToEquity as a percentage (e.g. 80 = 0.80 ratio)
+    # yfinance normally reports debtToEquity as a percentage (80 => 0.80 ratio),
+    # but some tickers come back already as a ratio. Values above 5 are treated
+    # as percentages; anything smaller is assumed to already be a ratio.
     _de = g(info, "debtToEquity")
-    debt_eq = fmt_num(float(_de) / 100) if _de is not None else "N/A"
+    debt_eq = "N/A"
+    if _de is not None:
+        try:
+            _de = float(_de)
+            debt_eq = fmt_num(_de / 100 if abs(_de) > 5 else _de)
+        except Exception:
+            debt_eq = "N/A"
 
     # ── Growth ──
+    # yfinance is inconsistent: growth figures come back either as decimal
+    # fractions (0.18) or as already-multiplied percentages (18.0), depending on
+    # the field and the library version. Normalise by magnitude.
+    def _as_pct(v):
+        if v is None:
+            return "N/A"
+        try:
+            f = float(v)
+            if math.isnan(f) or math.isinf(f):
+                return "N/A"
+            # |value| <= 3 is almost certainly a decimal fraction (<=300% growth);
+            # anything larger is already expressed in percent.
+            if abs(f) <= 3:
+                f *= 100
+            return f"{f:.2f}%"
+        except Exception:
+            return "N/A"
+
     # EPS Y/Y TTM & Sales come from actual trailing info fields
-    eps_yoy_ttm = fmt_pct(g(info, "earningsGrowth"))
-    sales_yoy   = fmt_pct(g(info, "revenueGrowth"))
+    eps_yoy_ttm = _as_pct(g(info, "earningsGrowth"))
+    sales_yoy   = _as_pct(g(info, "revenueGrowth"))
 
     # EPS this Y (0y) & next Y (+1y) come from analyst growth_estimates
     eps_this_y = "N/A"
@@ -163,13 +189,9 @@ def get_fundamentals(ticker, t, hist_1y, hist_1m):
             # First column holds the estimate (name varies: 'stockTrend'/ticker)
             col0 = ge.columns[0]
             if "0y" in ge.index:
-                v = ge.loc["0y", col0]
-                if v is not None and not (isinstance(v, float) and math.isnan(v)):
-                    eps_this_y = f"{float(v) * 100:.2f}%"
+                eps_this_y = _as_pct(ge.loc["0y", col0])
             if "+1y" in ge.index:
-                v = ge.loc["+1y", col0]
-                if v is not None and not (isinstance(v, float) and math.isnan(v)):
-                    eps_next_y = f"{float(v) * 100:.2f}%"
+                eps_next_y = _as_pct(ge.loc["+1y", col0])
     except Exception:
         pass
 
