@@ -19,7 +19,7 @@ TICKERS = [
     "FIX", "GEV", "GOOGL", "KLIC", "LLY", "LRCX", "IBM", "IESC", "INOD", "INTC", "IONQ", "MRVL", "META", "MP",
     "MSFT", "MU", "MTSI", "NBIS", "NET", "NFLX", "NOW", "NVDA", "ONTO", "PLTR", "ROKU",
     "RSI", "S", "SITM", "SNOW", "SPCX", "SYM", "TER", "TSM", "TSEM",
-    "TTMI", "V", "VRT", "VST", "WDC", "ZETA"
+    "TTMI", "V", "VRT", "VST", "WDC", "ZETA", "IBM"
 ]
 
 # ─── SCORE LOGIC (unchanged from original) ───────────────────────────────────
